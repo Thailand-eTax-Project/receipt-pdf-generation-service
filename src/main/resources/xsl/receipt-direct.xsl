@@ -33,7 +33,7 @@
 
         <fo:root>
             <fo:layout-master-set>
-                <fo:simple-page-master master-name="taxinvoice-page"
+                <fo:simple-page-master master-name="receipt-page"
                     page-width="{$page-width}" page-height="{$page-height}"
                     margin-top="{$margin}" margin-bottom="{$margin}"
                     margin-left="{$margin}" margin-right="{$margin}">
@@ -43,7 +43,7 @@
                 </fo:simple-page-master>
             </fo:layout-master-set>
 
-            <fo:page-sequence master-reference="taxinvoice-page">
+            <fo:page-sequence master-reference="receipt-page">
                 <!-- Header -->
                 <fo:static-content flow-name="xsl-region-before">
                     <fo:block font-family="{$font-family}" font-size="{$font-size-small}"
@@ -60,7 +60,7 @@
                                     </fo:table-cell>
                                     <fo:table-cell>
                                         <fo:block text-align="right">
-                                            e-Tax Tax Invoice / ใบรับ / RECEIPTอิเล็กทรอนิกส์
+                                            e-Tax Receipt / ใบเสร็จรับเงิน / RECEIPT อิเล็กทรอนิกส์
                                         </fo:block>
                                     </fo:table-cell>
                                 </fo:table-row>
@@ -103,7 +103,7 @@
                     <!-- Title -->
                     <fo:block font-family="{$font-family}" font-size="{$font-size-title}"
                         font-weight="bold" text-align="center" space-after="5mm" color="#333333">
-                        ใบเสร็จรับเงิน / ใบกำกับภาษี / RECEIPT / TAX INVOICE
+                        ใบเสร็จรับเงิน / RECEIPT
                     </fo:block>
                     <fo:block font-family="{$font-family}" font-size="{$font-size}"
                         text-align="center" space-after="10mm" color="#666666">
@@ -179,7 +179,7 @@
                             <fo:table-row>
                                 <fo:table-cell padding="2mm" border="0.5pt solid #dddddd" background-color="#e8e8e8">
                                     <fo:block font-weight="bold">เลขที่เอกสาร</fo:block>
-                                    <fo:block font-size="{$font-size-small}">Tax Invoice No.</fo:block>
+                                    <fo:block font-size="{$font-size-small}">Receipt No.</fo:block>
                                 </fo:table-cell>
                                 <fo:table-cell padding="2mm" border="0.5pt solid #dddddd">
                                     <fo:block><xsl:value-of select="$doc/ram:ID"/></fo:block>
