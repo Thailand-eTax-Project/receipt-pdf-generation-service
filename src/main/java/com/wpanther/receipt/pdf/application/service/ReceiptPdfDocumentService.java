@@ -7,6 +7,7 @@ import com.wpanther.receipt.pdf.domain.model.ReceiptPdfDocument;
 import com.wpanther.receipt.pdf.domain.repository.ReceiptPdfDocumentRepository;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.KafkaReceiptCompensateCommand;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.KafkaReceiptProcessCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.out.messaging.ReceiptPdfGeneratedEvent;
 import com.wpanther.receipt.pdf.infrastructure.metrics.PdfGenerationMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,7 +68,7 @@ public class ReceiptPdfDocumentService {
         applyRetryCount(doc, previousRetryCount);
         doc = repository.save(doc);
 
-        pdfEventPort.publishGenerated(doc, command.getCorrelationId());
+        pdfEventPort.publishGenerated(buildGeneratedEvent(doc, command));
         sagaReplyPort.publishSuccess(
                 command.getSagaId(), command.getSagaStep(), command.getCorrelationId(),
                 doc.getDocumentUrl(), doc.getFileSize());
@@ -102,7 +103,7 @@ public class ReceiptPdfDocumentService {
     @Transactional
     public void publishIdempotentSuccess(ReceiptPdfDocument existing,
                                          KafkaReceiptProcessCommand command) {
-        pdfEventPort.publishGenerated(existing, command.getCorrelationId());
+        pdfEventPort.publishGenerated(buildGeneratedEvent(existing, command));
         sagaReplyPort.publishSuccess(
                 command.getSagaId(), command.getSagaStep(), command.getCorrelationId(),
                 existing.getDocumentUrl(), existing.getFileSize());
@@ -139,6 +140,18 @@ public class ReceiptPdfDocumentService {
     public void publishCompensationFailure(KafkaReceiptCompensateCommand command, String error) {
         sagaReplyPort.publishFailure(
                 command.getSagaId(), command.getSagaStep(), command.getCorrelationId(), error);
+    }
+
+    private ReceiptPdfGeneratedEvent buildGeneratedEvent(ReceiptPdfDocument doc,
+                                                         KafkaReceiptProcessCommand command) {
+        return new ReceiptPdfGeneratedEvent(
+                command.getSagaId(),
+                command.getDocumentId(),
+                doc.getReceiptNumber(),
+                doc.getDocumentUrl(),
+                doc.getFileSize(),
+                doc.isXmlEmbedded(),
+                command.getCorrelationId());
     }
 
     private ReceiptPdfDocument requireDocument(UUID documentId) {

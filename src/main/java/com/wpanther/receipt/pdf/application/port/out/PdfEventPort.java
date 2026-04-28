@@ -1,8 +1,7 @@
 package com.wpanther.receipt.pdf.application.port.out;
 
-import com.wpanther.receipt.pdf.domain.model.ReceiptPdfDocument;
+import com.wpanther.receipt.pdf.infrastructure.adapter.out.messaging.ReceiptPdfGeneratedEvent;
 
 public interface PdfEventPort {
-
-    void publishGenerated(ReceiptPdfDocument document, String correlationId);
+    void publishGenerated(ReceiptPdfGeneratedEvent event);
 }
