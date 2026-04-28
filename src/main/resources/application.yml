@@ -1,0 +1,146 @@
+server:
+  port: 8095
+
+spring:
+  application:
+    name: receipt-pdf-generation-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:receiptpdf_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+# Apache Camel
+camel:
+  springboot:
+    name: receipt-pdf-generation-camel
+    main-run-controller: true
+  dataformat:
+    jackson:
+      auto-discover-object-mapper: true
+
+# Application-specific configuration
+app:
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    consumer:
+      command-group-id: ${KAFKA_COMMAND_GROUP_ID:receipt-pdf-generation-command}
+      compensation-group-id: ${KAFKA_COMPENSATION_GROUP_ID:receipt-pdf-generation-compensation}
+      break-on-first-error: ${KAFKA_BREAK_ON_FIRST_ERROR:true}
+      max-poll-records: ${KAFKA_MAX_POLL_RECORDS:100}
+      consumers-count: ${KAFKA_CONSUMERS_COUNT:3}
+    topics:
+      saga-command-receipt-pdf: saga.command.receipt-pdf
+      saga-compensation-receipt-pdf: saga.compensation.receipt-pdf
+      pdf-generated-receipt: pdf.generated.receipt
+      dlq: pdf.generation.receipt.dlq
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket-name: ${MINIO_BUCKET_NAME:receipts}
+    region: ${MINIO_REGION:us-east-1}
+    base-url: ${MINIO_BASE_URL:http://localhost:9000/receipts}
+    path-style-access: ${MINIO_PATH_STYLE_ACCESS:true}
+    # Orphaned PDF cleanup - disabled by default, enable with MINIO_CLEANUP_ENABLED=true
+    cleanup:
+      enabled: ${MINIO_CLEANUP_ENABLED:false}
+      cron: ${MINIO_CLEANUP_CRON:0 0 2 * * ?}  # Daily at 2 AM
+  pdf:
+    icc-profile-path: ${PDF_ICC_PROFILE_PATH:icc/sRGB.icc}
+    generation:
+      # Number of retries allowed after the initial attempt (total attempts = max-retries + 1).
+      # Example: max-retries=3 → 1 initial attempt + 3 retries = 4 total attempts before the saga step fails.
+      max-retries: ${PDF_GENERATION_MAX_RETRIES:3}
+      # Maximum concurrent FOP render jobs (each ~50-200 MB heap)
+      max-concurrent-renders: ${PDF_MAX_CONCURRENT_RENDERS:3}
+      # Maximum allowed PDF size in bytes (default: 50 MB)
+      max-pdf-size-bytes: ${PDF_MAX_SIZE_BYTES:52428800}
+  rest-client:
+    connect-timeout: ${REST_CLIENT_CONNECT_TIMEOUT:5000}
+    read-timeout: ${REST_CLIENT_READ_TIMEOUT:10000}
+    allowed-hosts: ${REST_CLIENT_ALLOWED_HOSTS:localhost}
+  # Font health check - validates Thai fonts at startup (enabled by default)
+  fonts:
+    health-check:
+      enabled: ${FONT_HEALTH_CHECK_ENABLED:true}
+      fail-on-error: ${FONT_HEALTH_CHECK_FAIL_ON_ERROR:true}
+
+# Resilience4j Circuit Breaker
+resilience4j:
+  circuitbreaker:
+    instances:
+      # MinIO S3 storage circuit breaker
+      minio:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+      # Signed XML fetch circuit breaker (document-storage-service)
+      signedXmlFetch:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+        permitted-number-of-calls-in-half-open-state: 3
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 3s
+
+# Eureka client configuration
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+
+# Actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,camelroutes
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.wpanther.receipt.pdf: INFO
+    org.apache.camel: INFO
+    org.apache.camel.component.kafka: DEBUG
+    org.apache.fop: INFO
+    org.apache.pdfbox: INFO

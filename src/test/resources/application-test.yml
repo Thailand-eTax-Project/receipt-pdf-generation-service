@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: receipt-pdf-generation-service-test
+
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  flyway:
+    enabled: false
+
+# Apache Camel - disabled for unit tests
+camel:
+  springboot:
+    name: receipt-pdf-generation-camel-test
+    main-run-controller: false
+  dataformat:
+    jackson:
+      auto-discover-object-mapper: true
+
+# Application configuration for tests
+app:
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: receipt-pdf-generation-service-test
+    topics:
+      saga-command-receipt-pdf: saga.command.receipt-pdf
+      saga-compensation-receipt-pdf: saga.compensation.receipt-pdf
+      pdf-generated-receipt: pdf.generated.receipt
+      dlq: pdf.generation.receipt.dlq
+  minio:
+    endpoint: http://localhost:9000
+    access-key: minioadmin
+    secret-key: minioadmin
+    bucket-name: receipts-test
+    region: us-east-1
+    base-url: http://localhost:9000/receipts-test
+    path-style-access: true
+
+# Disable Eureka for tests
+eureka:
+  client:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.wpanther.receipt.pdf: DEBUG
+    org.apache.camel: WARN
+
+# Disable font health check for tests
+app:
+  fonts:
+    health-check:
+      enabled: false
