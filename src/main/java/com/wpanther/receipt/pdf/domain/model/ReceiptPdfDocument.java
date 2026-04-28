@@ -75,6 +75,7 @@ public class ReceiptPdfDocument {
     }
 
     public void markFailed(String errorMessage) {
+        Objects.requireNonNull(errorMessage, "Error message is required when marking as failed");
         this.status = GenerationStatus.FAILED;
         this.errorMessage = errorMessage;
         this.completedAt = LocalDateTime.now();
