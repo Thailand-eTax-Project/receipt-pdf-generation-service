@@ -2,9 +2,8 @@ package com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wpanther.receipt.pdf.application.service.SagaCommandHandler;
-import com.wpanther.receipt.pdf.application.usecase.CompensateReceiptPdfUseCase;
-import com.wpanther.receipt.pdf.application.usecase.ProcessReceiptPdfUseCase;
+import com.wpanther.receipt.pdf.application.port.in.CompensateReceiptPdfUseCase;
+import com.wpanther.receipt.pdf.application.port.in.ProcessReceiptPdfUseCase;
 import com.wpanther.saga.domain.enums.SagaStep;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.camel.Exchange;
@@ -51,11 +50,13 @@ public class SagaRouteConfig extends RouteBuilder {
                             if (body instanceof KafkaReceiptProcessCommand cmd) {
                                 log.error("DLQ: notifying orchestrator of retry exhaustion for saga {} document {}",
                                         cmd.getSagaId(), cmd.getDocumentNumber());
-                                sagaCommandHandler.publishOrchestrationFailure(cmd, cause);
+                                sagaCommandHandler.publishOrchestrationFailure(
+                                        cmd.getSagaId(), cmd.getSagaStep(), cmd.getCorrelationId(), cause);
                             } else if (body instanceof KafkaReceiptCompensateCommand cmd) {
                                 log.error("DLQ: notifying orchestrator of compensation retry exhaustion for saga {} document {}",
                                         cmd.getSagaId(), cmd.getDocumentId());
-                                sagaCommandHandler.publishCompensationOrchestrationFailure(cmd, cause);
+                                sagaCommandHandler.publishCompensationOrchestrationFailure(
+                                        cmd.getSagaId(), cmd.getSagaStep(), cmd.getCorrelationId(), cause);
                             } else {
                                 log.error("DLQ: body not deserialized ({}); attempting saga metadata recovery",
                                         body == null ? "null" : body.getClass().getSimpleName());
@@ -78,7 +79,8 @@ public class SagaRouteConfig extends RouteBuilder {
                                 exchange.getIn().getBody(KafkaReceiptProcessCommand.class);
                         log.info("Processing saga command for saga: {}, document: {}",
                                         cmd.getSagaId(), cmd.getDocumentNumber());
-                        processUseCase.handle(cmd);
+                        processUseCase.process(cmd.getDocumentId(), cmd.getDocumentNumber(),
+                                cmd.getSignedXmlUrl(), cmd.getSagaId(), cmd.getSagaStep(), cmd.getCorrelationId());
                 })
                 .log("Successfully processed saga command");
 
@@ -97,7 +99,8 @@ public class SagaRouteConfig extends RouteBuilder {
                                 exchange.getIn().getBody(KafkaReceiptCompensateCommand.class);
                         log.info("Processing compensation for saga: {}, document: {}",
                                         cmd.getSagaId(), cmd.getDocumentId());
-                        compensateUseCase.handle(cmd);
+                        compensateUseCase.compensate(cmd.getDocumentId(), cmd.getSagaId(),
+                                cmd.getSagaStep(), cmd.getCorrelationId());
                 })
                 .log("Successfully processed compensation command");
     }
