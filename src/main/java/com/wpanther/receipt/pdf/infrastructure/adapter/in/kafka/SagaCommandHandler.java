@@ -3,7 +3,7 @@ package com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka;
 import com.wpanther.receipt.pdf.application.port.in.CompensateReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.application.port.in.ProcessReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.application.service.ReceiptPdfDocumentService;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptCompensateCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.CompensateReceiptPdfCommand;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ProcessReceiptPdfCommand;
 import com.wpanther.saga.domain.enums.SagaStep;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +51,7 @@ public class SagaCommandHandler {
      * Handle a ReceiptCompensateCommand from saga orchestrator.
      * Delegates to ReceiptPdfDocumentService.compensate() with plain fields.
      */
-    public void handleCompensation(ReceiptCompensateCommand command) {
+    public void handleCompensation(CompensateReceiptPdfCommand command) {
         log.info("Handling compensation for saga {} document {}",
                 command.getSagaId(), command.getDocumentId());
         pdfDocumentService.compensate(

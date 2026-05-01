@@ -8,7 +8,7 @@ import com.wpanther.saga.domain.model.SagaCommand;
 import java.time.Instant;
 import java.util.UUID;
 
-public class ReceiptCompensateCommand extends SagaCommand {
+public class CompensateReceiptPdfCommand extends SagaCommand {
 
     private static final long serialVersionUID = 1L;
 
@@ -16,7 +16,7 @@ public class ReceiptCompensateCommand extends SagaCommand {
     private final String documentId;
 
     @JsonCreator
-    public ReceiptCompensateCommand(
+    public CompensateReceiptPdfCommand(
             @JsonProperty("eventId") UUID eventId,
             @JsonProperty("occurredAt") Instant occurredAt,
             @JsonProperty("eventType") String eventType,
@@ -29,7 +29,7 @@ public class ReceiptCompensateCommand extends SagaCommand {
         this.documentId = documentId;
     }
 
-    public ReceiptCompensateCommand(String sagaId, SagaStep sagaStep, String correlationId,
+    public CompensateReceiptPdfCommand(String sagaId, SagaStep sagaStep, String correlationId,
                                     String documentId) {
         super(sagaId, sagaStep, correlationId);
         this.documentId = documentId;

@@ -2,7 +2,7 @@ package com.wpanther.receipt.pdf.application.service;
 
 import com.wpanther.saga.domain.enums.SagaStep;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.SagaCommandHandler;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptCompensateCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.CompensateReceiptPdfCommand;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ProcessReceiptPdfCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -90,7 +90,7 @@ class SagaCommandHandlerTest {
     @DisplayName("handleCompensation() delegates to compensate() with plain fields")
     void testHandleCompensation_DelegatesToCompensate() {
         // Given
-        ReceiptCompensateCommand command = new ReceiptCompensateCommand(
+        CompensateReceiptPdfCommand command = new CompensateReceiptPdfCommand(
                 "saga-001", SagaStep.GENERATE_RECEIPT_PDF, "corr-456",
                 "doc-123"
         );

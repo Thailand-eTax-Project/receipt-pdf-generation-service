@@ -7,7 +7,7 @@ import com.wpanther.receipt.pdf.application.port.in.CompensateReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.application.port.in.ProcessReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.SagaCommandHandler;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.SagaRouteConfig;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptCompensateCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.CompensateReceiptPdfCommand;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ProcessReceiptPdfCommand;
 import com.wpanther.receipt.pdf.application.dto.event.ReceiptPdfGeneratedEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,14 +78,14 @@ class CamelRouteConfigTest {
     @DisplayName("Should serialize and deserialize ReceiptCompensateCommand")
     void testCompensateReceiptPdfCommandSerialization() throws Exception {
         // Given
-        ReceiptCompensateCommand command = new ReceiptCompensateCommand(
+        CompensateReceiptPdfCommand command = new CompensateReceiptPdfCommand(
                 "saga-001", SagaStep.GENERATE_RECEIPT_PDF, "corr-456",
                 "doc-123"
         );
 
         // When
         String json = objectMapper.writeValueAsString(command);
-        ReceiptCompensateCommand deserialized = objectMapper.readValue(json, ReceiptCompensateCommand.class);
+        CompensateReceiptPdfCommand deserialized = objectMapper.readValue(json, CompensateReceiptPdfCommand.class);
 
         // Then
         assertThat(deserialized.getSagaId()).isEqualTo("saga-001");
