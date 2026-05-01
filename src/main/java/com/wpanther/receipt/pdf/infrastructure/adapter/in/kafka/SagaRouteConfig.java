@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wpanther.receipt.pdf.application.port.in.CompensateReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.application.port.in.ProcessReceiptPdfUseCase;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptCompensateCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptProcessCommand;
 import com.wpanther.saga.domain.enums.SagaStep;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.camel.Exchange;
@@ -13,6 +15,11 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Camel route configuration for saga command and compensation handling.
+ * Consumes messages from Kafka topics and delegates to use case interfaces
+ * with plain field parameters.
+ */
 @Component
 @Slf4j
 public class SagaRouteConfig extends RouteBuilder {
@@ -47,12 +54,12 @@ public class SagaRouteConfig extends RouteBuilder {
                         .onPrepareFailure(exchange -> {
                             Throwable cause = exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Throwable.class);
                             Object body = exchange.getIn().getBody();
-                            if (body instanceof KafkaReceiptProcessCommand cmd) {
+                            if (body instanceof ReceiptProcessCommand cmd) {
                                 log.error("DLQ: notifying orchestrator of retry exhaustion for saga {} document {}",
                                         cmd.getSagaId(), cmd.getDocumentNumber());
                                 sagaCommandHandler.publishOrchestrationFailure(
                                         cmd.getSagaId(), cmd.getSagaStep(), cmd.getCorrelationId(), cause);
-                            } else if (body instanceof KafkaReceiptCompensateCommand cmd) {
+                            } else if (body instanceof ReceiptCompensateCommand cmd) {
                                 log.error("DLQ: notifying orchestrator of compensation retry exhaustion for saga {} document {}",
                                         cmd.getSagaId(), cmd.getDocumentId());
                                 sagaCommandHandler.publishCompensationOrchestrationFailure(
@@ -73,10 +80,10 @@ public class SagaRouteConfig extends RouteBuilder {
                         + "&maxPollRecords={{app.kafka.consumer.max-poll-records:100}}"
                         + "&consumersCount={{app.kafka.consumer.consumers-count:3}}")
                 .routeId("saga-command-consumer")
-                .unmarshal().json(JsonLibrary.Jackson, KafkaReceiptProcessCommand.class)
+                .unmarshal().json(JsonLibrary.Jackson, ReceiptProcessCommand.class)
                 .process(exchange -> {
-                        KafkaReceiptProcessCommand cmd =
-                                exchange.getIn().getBody(KafkaReceiptProcessCommand.class);
+                        ReceiptProcessCommand cmd =
+                                exchange.getIn().getBody(ReceiptProcessCommand.class);
                         log.info("Processing saga command for saga: {}, document: {}",
                                         cmd.getSagaId(), cmd.getDocumentNumber());
                         processUseCase.process(cmd.getDocumentId(), cmd.getDocumentNumber(),
@@ -93,10 +100,10 @@ public class SagaRouteConfig extends RouteBuilder {
                         + "&maxPollRecords={{app.kafka.consumer.max-poll-records:100}}"
                         + "&consumersCount={{app.kafka.consumer.consumers-count:3}}")
                 .routeId("saga-compensation-consumer")
-                .unmarshal().json(JsonLibrary.Jackson, KafkaReceiptCompensateCommand.class)
+                .unmarshal().json(JsonLibrary.Jackson, ReceiptCompensateCommand.class)
                 .process(exchange -> {
-                        KafkaReceiptCompensateCommand cmd =
-                                exchange.getIn().getBody(KafkaReceiptCompensateCommand.class);
+                        ReceiptCompensateCommand cmd =
+                                exchange.getIn().getBody(ReceiptCompensateCommand.class);
                         log.info("Processing compensation for saga: {}, document: {}",
                                         cmd.getSagaId(), cmd.getDocumentId());
                         compensateUseCase.compensate(cmd.getDocumentId(), cmd.getSagaId(),

@@ -3,6 +3,7 @@ package com.wpanther.receipt.pdf.infrastructure.adapter.out.messaging;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.wpanther.saga.infrastructure.outbox.OutboxService;
+import com.wpanther.receipt.pdf.application.dto.event.ReceiptPdfGeneratedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
+/**
+ * Unit tests for EventPublisher.
+ *
+ * After layer separation refactor, ReceiptPdfGeneratedEvent lives in
+ * application.dto.event package.
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EventPublisher Unit Tests")
 class EventPublisherTest {

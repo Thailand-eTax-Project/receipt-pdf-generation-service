@@ -1,14 +1,13 @@
 package com.wpanther.receipt.pdf.application.service;
 
 import com.wpanther.saga.domain.enums.SagaStep;
+import com.wpanther.receipt.pdf.application.dto.event.ReceiptPdfGeneratedEvent;
 import com.wpanther.receipt.pdf.application.port.out.PdfEventPort;
 import com.wpanther.receipt.pdf.application.port.out.SagaReplyPort;
 import com.wpanther.receipt.pdf.domain.model.GenerationStatus;
 import com.wpanther.receipt.pdf.domain.model.ReceiptPdfDocument;
 import com.wpanther.receipt.pdf.domain.repository.ReceiptPdfDocumentRepository;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.KafkaReceiptCompensateCommand;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.KafkaReceiptProcessCommand;
-import com.wpanther.receipt.pdf.infrastructure.adapter.out.messaging.ReceiptPdfGeneratedEvent;
+import com.wpanther.receipt.pdf.domain.service.ReceiptPdfGenerationService;
 import com.wpanther.receipt.pdf.infrastructure.metrics.PdfGenerationMetrics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,6 +23,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * Unit tests for ReceiptPdfDocumentService.
+ *
+ * After layer separation refactor:
+ * - process() takes plain fields (documentId, documentNumber, signedXmlUrl, sagaId, sagaStep, correlationId)
+ * - compensate() takes plain fields (documentId, sagaId, sagaStep, correlationId)
+ * - publishIdempotentSuccess() takes plain fields
+ * - publishRetryExhausted() takes plain fields
+ * - publishGenerationFailure() takes plain fields
+ * - publishCompensated() takes plain fields
+ * - publishCompensationFailure() takes plain fields
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ReceiptPdfDocumentService Unit Tests")
 class ReceiptPdfDocumentServiceTest {
@@ -40,18 +51,20 @@ class ReceiptPdfDocumentServiceTest {
     @Mock
     private PdfGenerationMetrics pdfGenerationMetrics;
 
-    // Note: Using reflection to instantiate because Lombok @RequiredArgsConstructor
-    // is scope=provided, not available during test compilation
+    @Mock
+    private com.wpanther.receipt.pdf.application.port.out.SignedXmlFetchPort signedXmlFetchPort;
+
+    @Mock
+    private ReceiptPdfGenerationService pdfGenerationService;
+
+    @Mock
+    private com.wpanther.receipt.pdf.application.port.out.PdfStoragePort pdfStoragePort;
+
     private ReceiptPdfDocumentService getService() {
-        try {
-            return ReceiptPdfDocumentService.class
-                    .getDeclaredConstructor(ReceiptPdfDocumentRepository.class,
-                                           PdfEventPort.class, SagaReplyPort.class,
-                                           PdfGenerationMetrics.class)
-                    .newInstance(repository, pdfEventPort, sagaReplyPort, pdfGenerationMetrics);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to instantiate ReceiptPdfDocumentService", e);
-        }
+        return new ReceiptPdfDocumentService(
+                repository, pdfEventPort, sagaReplyPort,
+                pdfGenerationMetrics, signedXmlFetchPort,
+                pdfGenerationService, pdfStoragePort);
     }
 
     private ReceiptPdfDocument createCompletedDocument() {
@@ -59,12 +72,12 @@ class ReceiptPdfDocumentServiceTest {
                 .id(UUID.randomUUID())
                 .receiptId("rcpt-inv-001")
                 .receiptNumber("RCP-001")
-                .status(GenerationStatus.GENERATING) // Start in GENERATING
+                .status(GenerationStatus.COMPLETED)
+                .documentPath("2024/01/15/test.pdf")
+                .documentUrl("http://localhost:9000/receipts/test.pdf")
+                .fileSize(5000L)
                 .mimeType("application/pdf")
                 .build();
-        // Now transition to COMPLETED via the proper method
-        doc.markCompleted("2024/01/15/test.pdf", "http://localhost:9000/receipts/test.pdf", 5000L);
-        doc.markXmlEmbedded();
         return doc;
     }
 
@@ -123,100 +136,111 @@ class ReceiptPdfDocumentServiceTest {
     }
 
     @Test
-    @DisplayName("publishIdempotentSuccess() publishes events for already completed document")
+    @DisplayName("publishIdempotentSuccess() publishes events for already completed document (plain fields)")
     void testPublishIdempotentSuccess() {
         // Given
         ReceiptPdfDocument doc = createCompletedDocument();
-        KafkaReceiptProcessCommand command = new KafkaReceiptProcessCommand(
-                "saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1",
-                "doc-1", "RCP-001",
-                "http://minio:9000/signed.xml");
+        String documentId = "doc-1";
+        String documentNumber = "RCP-001";
+        String sagaId = "saga-1";
+        SagaStep sagaStep = SagaStep.GENERATE_RECEIPT_PDF;
+        String correlationId = "corr-1";
 
         // When
         var service = getService();
-        service.publishIdempotentSuccess(doc, command);
+        service.publishIdempotentSuccess(doc, documentId, documentNumber, sagaId, sagaStep, correlationId);
 
         // Then
         verify(pdfEventPort).publishGenerated(any(ReceiptPdfGeneratedEvent.class));
-        verify(sagaReplyPort).publishSuccess("saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1",
+        verify(sagaReplyPort).publishSuccess(sagaId, sagaStep, correlationId,
                 "http://localhost:9000/receipts/test.pdf", 5000L);
     }
 
     @Test
-    @DisplayName("publishRetryExhausted() publishes failure reply")
+    @DisplayName("publishRetryExhausted() publishes failure reply (plain fields)")
     void testPublishRetryExhausted() {
         // Given
-        KafkaReceiptProcessCommand command = new KafkaReceiptProcessCommand(
-                "saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1",
-                "doc-1", "RCP-001",
-                "http://minio:9000/signed.xml");
+        String sagaId = "saga-1";
+        SagaStep sagaStep = SagaStep.GENERATE_RECEIPT_PDF;
+        String correlationId = "corr-1";
+        String documentId = "doc-1";
+        String documentNumber = "RCP-001";
 
         // When
         var service = getService();
-        service.publishRetryExhausted(command);
+        service.publishRetryExhausted(sagaId, sagaStep, correlationId, documentId, documentNumber);
 
         // Then
-        verify(sagaReplyPort).publishFailure("saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1",
+        verify(sagaReplyPort).publishFailure(sagaId, sagaStep, correlationId,
                 "Maximum retry attempts exceeded");
     }
 
     @Test
-    @DisplayName("publishGenerationFailure() publishes failure with error message")
+    @DisplayName("publishGenerationFailure() publishes failure with error message (plain fields)")
     void testPublishGenerationFailure() {
         // Given
-        KafkaReceiptProcessCommand command = new KafkaReceiptProcessCommand(
-                "saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1",
-                "doc-1", "RCP-001",
-                "http://minio:9000/signed.xml");
+        String sagaId = "saga-1";
+        SagaStep sagaStep = SagaStep.GENERATE_RECEIPT_PDF;
+        String correlationId = "corr-1";
         String errorMessage = "Invalid XML format";
 
         // When
         var service = getService();
-        service.publishGenerationFailure(command, errorMessage);
+        service.publishGenerationFailure(sagaId, sagaStep, correlationId, errorMessage);
 
         // Then
-        verify(sagaReplyPort).publishFailure("saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1",
+        verify(sagaReplyPort).publishFailure(sagaId, sagaStep, correlationId,
                 errorMessage);
     }
 
     @Test
-    @DisplayName("publishCompensated() publishes COMPENSATED reply")
+    @DisplayName("publishCompensated() publishes COMPENSATED reply (plain fields)")
     void testPublishCompensated() {
         // Given
-        KafkaReceiptCompensateCommand command = new KafkaReceiptCompensateCommand(
-                "saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1",
-                "doc-1");
+        String sagaId = "saga-1";
+        SagaStep sagaStep = SagaStep.GENERATE_RECEIPT_PDF;
+        String correlationId = "corr-1";
 
         // When
         var service = getService();
-        service.publishCompensated(command);
+        service.publishCompensated(sagaId, sagaStep, correlationId);
 
         // Then
-        verify(sagaReplyPort).publishCompensated("saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1");
+        verify(sagaReplyPort).publishCompensated(sagaId, sagaStep, correlationId);
     }
 
     @Test
-    @DisplayName("publishCompensationFailure() publishes failure for compensation error")
+    @DisplayName("publishCompensationFailure() publishes failure for compensation error (plain fields)")
     void testPublishCompensationFailure() {
         // Given
-        KafkaReceiptCompensateCommand command = new KafkaReceiptCompensateCommand(
-                "saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1",
-                "doc-1");
+        String sagaId = "saga-1";
+        SagaStep sagaStep = SagaStep.GENERATE_RECEIPT_PDF;
+        String correlationId = "corr-1";
         String error = "Failed to delete PDF file";
 
         // When
         var service = getService();
-        service.publishCompensationFailure(command, error);
+        service.publishCompensationFailure(sagaId, sagaStep, correlationId, error);
 
         // Then
-        verify(sagaReplyPort).publishFailure("saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1", error);
+        verify(sagaReplyPort).publishFailure(sagaId, sagaStep, correlationId, error);
     }
 
     @Test
-    @DisplayName("completeGenerationAndPublish() marks COMPLETED and publishes events")
+    @DisplayName("completeGenerationAndPublish() marks COMPLETED and publishes events (plain fields)")
     void testCompleteGenerationAndPublish() {
         // Given
         UUID documentId = UUID.randomUUID();
+        String documentPath = "2024/01/15/test.pdf";
+        String fileUrl = "http://localhost:9000/receipts/test.pdf";
+        long fileSize = 5000L;
+        int previousRetryCount = 0;
+        String documentIdParam = "doc-1";
+        String documentNumber = "RCP-001";
+        String sagaId = "saga-1";
+        SagaStep sagaStep = SagaStep.GENERATE_RECEIPT_PDF;
+        String correlationId = "corr-1";
+
         ReceiptPdfDocument doc = ReceiptPdfDocument.builder()
                 .id(documentId)
                 .receiptId("rcpt-inv-001")
@@ -225,29 +249,25 @@ class ReceiptPdfDocumentServiceTest {
                 .mimeType("application/pdf")
                 .build();
 
-        // Create a completed document with the same ID for the mock return
         ReceiptPdfDocument savedDoc = ReceiptPdfDocument.builder()
                 .id(documentId)
                 .receiptId("rcpt-inv-001")
                 .receiptNumber("RCP-001")
-                .status(GenerationStatus.GENERATING)
+                .status(GenerationStatus.COMPLETED)
+                .documentPath(documentPath)
+                .documentUrl(fileUrl)
+                .fileSize(fileSize)
                 .mimeType("application/pdf")
+                .xmlEmbedded(true)
                 .build();
-        savedDoc.markCompleted("2024/01/15/test.pdf", "http://localhost:9000/receipts/test.pdf", 5000L);
-        savedDoc.markXmlEmbedded();
 
         when(repository.findById(documentId)).thenReturn(Optional.of(doc));
         when(repository.save(any())).thenReturn(savedDoc);
 
-        KafkaReceiptProcessCommand command = new KafkaReceiptProcessCommand(
-                "saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1",
-                "doc-1", "RCP-001",
-                "http://minio:9000/signed.xml");
-
         // When
         var service = getService();
-        service.completeGenerationAndPublish(documentId, "2024/01/15/test.pdf",
-                "http://localhost:9000/receipts/test.pdf", 5000L, 0, command);
+        service.completeGenerationAndPublish(documentId, documentPath, fileUrl, fileSize,
+                previousRetryCount, documentIdParam, documentNumber, sagaId, sagaStep, correlationId);
 
         // Then
         ArgumentCaptor<ReceiptPdfDocument> captor = ArgumentCaptor.forClass(ReceiptPdfDocument.class);
@@ -258,15 +278,22 @@ class ReceiptPdfDocumentServiceTest {
         assertThat(saved.isXmlEmbedded()).isTrue();
 
         verify(pdfEventPort).publishGenerated(any(ReceiptPdfGeneratedEvent.class));
-        verify(sagaReplyPort).publishSuccess("saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1",
-                "http://localhost:9000/receipts/test.pdf", 5000L);
+        verify(sagaReplyPort).publishSuccess(sagaId, sagaStep, correlationId, fileUrl, fileSize);
     }
 
     @Test
-    @DisplayName("failGenerationAndPublish() marks FAILED and publishes failure")
+    @DisplayName("failGenerationAndPublish() marks FAILED and publishes failure (plain fields)")
     void testFailGenerationAndPublish() {
         // Given
         UUID documentId = UUID.randomUUID();
+        String errorMessage = "PDF generation failed";
+        int previousRetryCount = 0;
+        String documentIdParam = "doc-1";
+        String documentNumber = "RCP-001";
+        String sagaId = "saga-1";
+        SagaStep sagaStep = SagaStep.GENERATE_RECEIPT_PDF;
+        String correlationId = "corr-1";
+
         ReceiptPdfDocument doc = ReceiptPdfDocument.builder()
                 .id(documentId)
                 .receiptId("rcpt-inv-001")
@@ -274,26 +301,23 @@ class ReceiptPdfDocumentServiceTest {
                 .status(GenerationStatus.GENERATING)
                 .mimeType("application/pdf")
                 .build();
+
         ReceiptPdfDocument savedDoc = ReceiptPdfDocument.builder()
                 .id(documentId)
                 .receiptId("rcpt-inv-001")
                 .receiptNumber("RCP-001")
                 .status(GenerationStatus.FAILED)
-                .errorMessage("PDF generation failed")
+                .errorMessage(errorMessage)
                 .mimeType("application/pdf")
                 .build();
+
         when(repository.findById(documentId)).thenReturn(Optional.of(doc));
         when(repository.save(any())).thenReturn(savedDoc);
 
-        KafkaReceiptProcessCommand command = new KafkaReceiptProcessCommand(
-                "saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1",
-                "doc-1", "RCP-001",
-                "http://minio:9000/signed.xml");
-        String errorMessage = "PDF generation failed";
-
         // When
         var service = getService();
-        service.failGenerationAndPublish(documentId, errorMessage, 0, command);
+        service.failGenerationAndPublish(documentId, errorMessage, previousRetryCount,
+                documentIdParam, documentNumber, sagaId, sagaStep, correlationId);
 
         // Then
         ArgumentCaptor<ReceiptPdfDocument> captor = ArgumentCaptor.forClass(ReceiptPdfDocument.class);
@@ -303,6 +327,6 @@ class ReceiptPdfDocumentServiceTest {
         assertThat(saved.getStatus()).isEqualTo(GenerationStatus.FAILED);
         assertThat(saved.getErrorMessage()).isEqualTo(errorMessage);
 
-        verify(sagaReplyPort).publishFailure("saga-1", SagaStep.GENERATE_RECEIPT_PDF, "corr-1", errorMessage);
+        verify(sagaReplyPort).publishFailure(sagaId, sagaStep, correlationId, errorMessage);
     }
 }
