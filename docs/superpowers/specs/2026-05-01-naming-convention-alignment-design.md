@@ -62,5 +62,5 @@ After rename:
 2. `mvn test` — verify all 101 tests pass
 
 Tests that may need updates:
-- `SagaRouteConfigTest.java` — uses DTO class names in assertions
+- `CamelRouteConfigTest.java` — uses DTO class names in assertions
 - Any test that constructs or references the command classes directly
