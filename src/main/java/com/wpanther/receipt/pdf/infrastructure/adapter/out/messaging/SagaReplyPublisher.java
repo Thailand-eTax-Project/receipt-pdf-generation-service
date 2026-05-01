@@ -2,7 +2,9 @@ package com.wpanther.receipt.pdf.infrastructure.adapter.out.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wpanther.receipt.pdf.application.port.out.SagaReplyPort;
+import com.wpanther.saga.domain.enums.ReplyStatus;
 import com.wpanther.saga.domain.enums.SagaStep;
+import com.wpanther.saga.domain.model.SagaReply;
 import com.wpanther.saga.infrastructure.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -103,6 +105,56 @@ public class SagaReplyPublisher implements SagaReplyPort {
             return objectMapper.writeValueAsString(map);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to serialize outbox event headers — aborting to prevent publishing without correlation headers", e);
+        }
+    }
+
+    /**
+     * Saga reply event for receipt PDF generation service.
+     * Published to Kafka topic: saga.reply.receipt-pdf
+     *
+     * SUCCESS replies include pdfUrl and pdfSize so the orchestrator
+     * can forward the URL to subsequent steps.
+     */
+    private static class ReceiptPdfReplyEvent extends SagaReply {
+
+        private static final long serialVersionUID = 1L;
+
+        // Additional fields included in SUCCESS replies
+        private String pdfUrl;
+        private Long pdfSize;
+
+        public static ReceiptPdfReplyEvent success(
+                String sagaId, SagaStep sagaStep, String correlationId,
+                String pdfUrl, Long pdfSize) {
+            ReceiptPdfReplyEvent reply = new ReceiptPdfReplyEvent(sagaId, sagaStep, correlationId, ReplyStatus.SUCCESS);
+            reply.pdfUrl = pdfUrl;
+            reply.pdfSize = pdfSize;
+            return reply;
+        }
+
+        public static ReceiptPdfReplyEvent failure(String sagaId, SagaStep sagaStep, String correlationId,
+                                                   String errorMessage) {
+            return new ReceiptPdfReplyEvent(sagaId, sagaStep, correlationId, errorMessage);
+        }
+
+        public static ReceiptPdfReplyEvent compensated(String sagaId, SagaStep sagaStep, String correlationId) {
+            return new ReceiptPdfReplyEvent(sagaId, sagaStep, correlationId, ReplyStatus.COMPENSATED);
+        }
+
+        private ReceiptPdfReplyEvent(String sagaId, SagaStep sagaStep, String correlationId, ReplyStatus status) {
+            super(sagaId, sagaStep, correlationId, status);
+        }
+
+        private ReceiptPdfReplyEvent(String sagaId, SagaStep sagaStep, String correlationId, String errorMessage) {
+            super(sagaId, sagaStep, correlationId, errorMessage);
+        }
+
+        public String getPdfUrl() {
+            return pdfUrl;
+        }
+
+        public Long getPdfSize() {
+            return pdfSize;
         }
     }
 }
