@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wpanther.receipt.pdf.application.port.in.CompensateReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.application.port.in.ProcessReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptCompensateCommand;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptProcessCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ProcessReceiptPdfCommand;
 import com.wpanther.saga.domain.enums.SagaStep;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.camel.Exchange;
@@ -54,7 +54,7 @@ public class SagaRouteConfig extends RouteBuilder {
                         .onPrepareFailure(exchange -> {
                             Throwable cause = exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Throwable.class);
                             Object body = exchange.getIn().getBody();
-                            if (body instanceof ReceiptProcessCommand cmd) {
+                            if (body instanceof ProcessReceiptPdfCommand cmd) {
                                 log.error("DLQ: notifying orchestrator of retry exhaustion for saga {} document {}",
                                         cmd.getSagaId(), cmd.getDocumentNumber());
                                 sagaCommandHandler.publishOrchestrationFailure(
@@ -80,10 +80,10 @@ public class SagaRouteConfig extends RouteBuilder {
                         + "&maxPollRecords={{app.kafka.consumer.max-poll-records:100}}"
                         + "&consumersCount={{app.kafka.consumer.consumers-count:3}}")
                 .routeId("saga-command-consumer")
-                .unmarshal().json(JsonLibrary.Jackson, ReceiptProcessCommand.class)
+                .unmarshal().json(JsonLibrary.Jackson, ProcessReceiptPdfCommand.class)
                 .process(exchange -> {
-                        ReceiptProcessCommand cmd =
-                                exchange.getIn().getBody(ReceiptProcessCommand.class);
+                        ProcessReceiptPdfCommand cmd =
+                                exchange.getIn().getBody(ProcessReceiptPdfCommand.class);
                         log.info("Processing saga command for saga: {}, document: {}",
                                         cmd.getSagaId(), cmd.getDocumentNumber());
                         processUseCase.process(cmd.getDocumentId(), cmd.getDocumentNumber(),

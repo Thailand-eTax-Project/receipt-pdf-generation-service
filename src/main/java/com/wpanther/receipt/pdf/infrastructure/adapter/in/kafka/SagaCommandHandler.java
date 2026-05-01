@@ -4,7 +4,7 @@ import com.wpanther.receipt.pdf.application.port.in.CompensateReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.application.port.in.ProcessReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.application.service.ReceiptPdfDocumentService;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptCompensateCommand;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptProcessCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ProcessReceiptPdfCommand;
 import com.wpanther.saga.domain.enums.SagaStep;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,13 +24,13 @@ public class SagaCommandHandler {
     private final ReceiptPdfDocumentService pdfDocumentService;
 
     /**
-     * Handle a ReceiptProcessCommand from saga orchestrator.
+     * Handle a ProcessReceiptPdfCommand from saga orchestrator.
      * Delegates to ReceiptPdfDocumentService.process() with plain fields.
      * Catches ReceiptPdfGenerationException after the saga reply has been committed to outbox,
      * returns normally so Camel commits the Kafka offset.
      */
-    public void handleProcessCommand(ReceiptProcessCommand command) {
-        log.info("Handling ReceiptProcessCommand for saga {} document {}",
+    public void handleProcessCommand(ProcessReceiptPdfCommand command) {
+        log.info("Handling ProcessReceiptPdfCommand for saga {} document {}",
                 command.getSagaId(), command.getDocumentNumber());
         try {
             pdfDocumentService.process(

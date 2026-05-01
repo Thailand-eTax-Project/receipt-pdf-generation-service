@@ -3,7 +3,7 @@ package com.wpanther.receipt.pdf.application.service;
 import com.wpanther.saga.domain.enums.SagaStep;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.SagaCommandHandler;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptCompensateCommand;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptProcessCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ProcessReceiptPdfCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,7 +44,7 @@ class SagaCommandHandlerTest {
     @DisplayName("handleProcessCommand() delegates to process() with correct plain fields")
     void testHandleProcessCommand_DelegatesToProcess() throws Exception {
         // Given
-        ReceiptProcessCommand command = new ReceiptProcessCommand(
+        ProcessReceiptPdfCommand command = new ProcessReceiptPdfCommand(
                 "saga-001", SagaStep.GENERATE_RECEIPT_PDF, "corr-456",
                 "doc-123", "RCP-2024-001",
                 "http://minio:9000/signed/receipt-signed.xml"
@@ -68,7 +68,7 @@ class SagaCommandHandlerTest {
     @DisplayName("handleProcessCommand() catches ReceiptPdfGenerationException and returns normally")
     void testHandleProcessCommand_ExceptionCaught() throws Exception {
         // Given
-        ReceiptProcessCommand command = new ReceiptProcessCommand(
+        ProcessReceiptPdfCommand command = new ProcessReceiptPdfCommand(
                 "saga-001", SagaStep.GENERATE_RECEIPT_PDF, "corr-456",
                 "doc-123", "RCP-2024-001",
                 "http://minio:9000/signed/receipt-signed.xml"

@@ -8,7 +8,7 @@ import com.wpanther.receipt.pdf.application.port.in.ProcessReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.SagaCommandHandler;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.SagaRouteConfig;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptCompensateCommand;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptProcessCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ProcessReceiptPdfCommand;
 import com.wpanther.receipt.pdf.application.dto.event.ReceiptPdfGeneratedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,10 +51,10 @@ class CamelRouteConfigTest {
     }
 
     @Test
-    @DisplayName("Should serialize and deserialize ReceiptProcessCommand")
+    @DisplayName("Should serialize and deserialize ProcessReceiptPdfCommand")
     void testProcessReceiptPdfCommandSerialization() throws Exception {
         // Given
-        ReceiptProcessCommand command = new ReceiptProcessCommand(
+        ProcessReceiptPdfCommand command = new ProcessReceiptPdfCommand(
                 "saga-001", SagaStep.GENERATE_RECEIPT_PDF, "corr-456",
                 "doc-123", "RCP-2024-001",
                 "http://minio/receipt-signed.xml"
@@ -62,7 +62,7 @@ class CamelRouteConfigTest {
 
         // When
         String json = objectMapper.writeValueAsString(command);
-        ReceiptProcessCommand deserialized = objectMapper.readValue(json, ReceiptProcessCommand.class);
+        ProcessReceiptPdfCommand deserialized = objectMapper.readValue(json, ProcessReceiptPdfCommand.class);
 
         // Then
         assertThat(deserialized.getSagaId()).isEqualTo("saga-001");
@@ -114,7 +114,7 @@ class CamelRouteConfigTest {
     }
 
     @Test
-    @DisplayName("Should deserialize ReceiptProcessCommand from JSON with kebab-case sagaStep")
+    @DisplayName("Should deserialize ProcessReceiptPdfCommand from JSON with kebab-case sagaStep")
     void testProcessCommandDeserialization() throws Exception {
         // Given - sagaStep uses kebab-case code as serialized by SagaStep @JsonValue
         String json = """
@@ -133,7 +133,7 @@ class CamelRouteConfigTest {
             """;
 
         // When
-        ReceiptProcessCommand cmd = objectMapper.readValue(json, ReceiptProcessCommand.class);
+        ProcessReceiptPdfCommand cmd = objectMapper.readValue(json, ProcessReceiptPdfCommand.class);
 
         // Then
         assertThat(cmd.getEventId()).isEqualTo(UUID.fromString("550e8400-e29b-41d4-a716-446655440000"));

@@ -8,7 +8,7 @@ import com.wpanther.saga.domain.model.SagaCommand;
 import java.time.Instant;
 import java.util.UUID;
 
-public class ReceiptProcessCommand extends SagaCommand {
+public class ProcessReceiptPdfCommand extends SagaCommand {
 
     private static final long serialVersionUID = 1L;
 
@@ -22,7 +22,7 @@ public class ReceiptProcessCommand extends SagaCommand {
     private final String signedXmlUrl;
 
     @JsonCreator
-    public ReceiptProcessCommand(
+    public ProcessReceiptPdfCommand(
             @JsonProperty("eventId") UUID eventId,
             @JsonProperty("occurredAt") Instant occurredAt,
             @JsonProperty("eventType") String eventType,
@@ -39,7 +39,7 @@ public class ReceiptProcessCommand extends SagaCommand {
         this.signedXmlUrl = signedXmlUrl;
     }
 
-    public ReceiptProcessCommand(String sagaId, SagaStep sagaStep, String correlationId,
+    public ProcessReceiptPdfCommand(String sagaId, SagaStep sagaStep, String correlationId,
                                  String documentId, String documentNumber, String signedXmlUrl) {
         super(sagaId, sagaStep, correlationId);
         this.documentId = documentId;
