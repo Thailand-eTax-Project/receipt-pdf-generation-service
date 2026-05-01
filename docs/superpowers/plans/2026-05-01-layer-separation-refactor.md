@@ -293,7 +293,7 @@ package com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka;
 import com.wpanther.receipt.pdf.application.port.in.CompensateReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.application.port.in.ProcessReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.application.service.ReceiptPdfDocumentService;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.CompensateReceiptPdfCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptCompensateCommand;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptProcessCommand;
 import com.wpanther.saga.domain.enums.SagaStep;
 import lombok.RequiredArgsConstructor;
@@ -341,7 +341,7 @@ public class SagaCommandHandler {
      * Handle a ReceiptCompensateCommand from saga orchestrator.
      * Delegates to ReceiptPdfDocumentService.compensate() with plain fields.
      */
-    public void handleCompensation(CompensateReceiptPdfCommand command) {
+    public void handleCompensation(ReceiptCompensateCommand command) {
         log.info("Handling compensation for saga {} document {}",
                 command.getSagaId(), command.getDocumentId());
         pdfDocumentService.compensate(
@@ -393,9 +393,7 @@ public class SagaCommandHandler {
 }
 ```
 
-Note: The new `SagaCommandHandler` references `CompensateReceiptPdfCommand` and `ReceiptProcessCommand` from the `dto/` package, but those file names include `Compensate` vs `ReceiptCompensate`. Fix the import to match the actual class name created in Task 2.
-
-Actually: in Task 1 I named it `ReceiptProcessCommand` and Task 2 I named it `ReceiptCompensateCommand`. Update imports accordingly.
+Note: The new `SagaCommandHandler` uses `ReceiptCompensateCommand` (from `dto/` package, created in Task 2).
 
 - [ ] **Step 2: Compile and fix any errors**
 
@@ -1082,10 +1080,9 @@ git commit -m "refactor: delete old saga command classes and Kafka prefix files"
 
 Key changes:
 1. Change `KafkaReceiptProcessCommand` → `ReceiptProcessCommand` (from `dto/` package)
-2. Change `KafkaReceiptCompensateCommand` → `ReceiptCompensateCommand` (from `dto/` package)
-3. Route processors call `sagaCommandHandler.handleProcessCommand(cmd)` and `sagaCommandHandler.handleCompensation(cmd)` with the DTO — the handler extracts fields
-4. `onPrepareFailure` instanceof checks updated to new DTO names
-5. `publishOrchestrationFailure(cmd, cause)` calls updated to `publishOrchestrationFailure(cmd.getSagaId(), cmd.getSagaStep(), cmd.getCorrelationId(), cause)` with plain fields
+2. Route processors call `sagaCommandHandler.handleProcessCommand(cmd)` and `sagaCommandHandler.handleCompensation(cmd)` with the DTO — the handler extracts fields
+3. `onPrepareFailure` instanceof checks updated to new DTO names
+4. `publishOrchestrationFailure(cmd, cause)` calls updated to `publishOrchestrationFailure(cmd.getSagaId(), cmd.getSagaStep(), cmd.getCorrelationId(), cause)` with plain fields
 
 - [ ] **Step 1: Rewrite SagaRouteConfig**
 
@@ -1094,7 +1091,7 @@ package com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.CompensateReceiptPdfCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptCompensateCommand;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptProcessCommand;
 import com.wpanther.saga.domain.enums.SagaStep;
 import lombok.RequiredArgsConstructor;
@@ -1134,7 +1131,7 @@ public class SagaRouteConfig extends RouteBuilder {
                                         cmd.getSagaId(), cmd.getDocumentNumber());
                                 sagaCommandHandler.publishOrchestrationFailure(
                                         cmd.getSagaId(), cmd.getSagaStep(), cmd.getCorrelationId(), cause);
-                            } else if (body instanceof CompensateReceiptPdfCommand cmd) {
+                            } else if (body instanceof ReceiptCompensateCommand cmd) {
                                 log.error("DLQ: notifying orchestrator of compensation retry exhaustion for saga {} document {}",
                                         cmd.getSagaId(), cmd.getDocumentId());
                                 sagaCommandHandler.publishCompensationOrchestrationFailure(
@@ -1175,9 +1172,9 @@ public class SagaRouteConfig extends RouteBuilder {
                         + "&consumersCount={{app.kafka.consumer.consumers-count:3}}")
                 .routeId("saga-compensation-consumer")
                 .log(LoggingLevel.DEBUG, "Received compensation command from Kafka: partition=${header[kafka.PARTITION]}, offset=${header[kafka.OFFSET]}")
-                .unmarshal().json(JsonLibrary.Jackson, CompensateReceiptPdfCommand.class)
+                .unmarshal().json(JsonLibrary.Jackson, ReceiptCompensateCommand.class)
                 .process(exchange -> {
-                        CompensateReceiptPdfCommand cmd = exchange.getIn().getBody(CompensateReceiptPdfCommand.class);
+                        ReceiptCompensateCommand cmd = exchange.getIn().getBody(ReceiptCompensateCommand.class);
                         log.info("Processing compensation for saga: {}, document: {}",
                                         cmd.getSagaId(), cmd.getDocumentId());
                         sagaCommandHandler.handleCompensation(cmd);
@@ -1212,7 +1209,7 @@ public class SagaRouteConfig extends RouteBuilder {
 }
 ```
 
-Note: The `CompensateReceiptPdfCommand` class name in Task 2 was `ReceiptCompensateCommand`. Fix accordingly.
+Note: Uses `ReceiptCompensateCommand` (from `dto/` package, created in Task 2).
 
 - [ ] **Step 2: Compile**
 
@@ -1247,7 +1244,7 @@ import com.wpanther.saga.domain.enums.SagaStep;
 import com.wpanther.receipt.pdf.domain.model.GenerationStatus;
 import com.wpanther.receipt.pdf.domain.model.ReceiptPdfDocument;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.SagaCommandHandler;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.CompensateReceiptPdfCommand;
+import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptCompensateCommand;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto.ReceiptProcessCommand;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -1280,8 +1277,8 @@ class SagaCommandHandlerTest {
         );
     }
 
-    private CompensateReceiptPdfCommand createCompensateCommand() {
-        return new CompensateReceiptPdfCommand(
+    private ReceiptCompensateCommand createCompensateCommand() {
+        return new ReceiptCompensateCommand(
                 "saga-001", SagaStep.GENERATE_RECEIPT_PDF, "corr-456",
                 "doc-123"
         );
@@ -1311,7 +1308,7 @@ class SagaCommandHandlerTest {
     @DisplayName("handleCompensation() delegates to pdfDocumentService.compensate() with plain fields")
     void testHandleCompensation_DelegatesToService() {
         // Given
-        CompensateReceiptPdfCommand command = createCompensateCommand();
+        ReceiptCompensateCommand command = createCompensateCommand();
 
         // When
         getHandler().handleCompensation(command);
@@ -1362,7 +1359,7 @@ Also remove all imports for `KafkaReceiptProcessCommand` and `KafkaReceiptCompen
 
 ### Update CamelRouteConfigTest
 
-Update all references from `KafkaReceiptProcessCommand` → `ReceiptProcessCommand` and `KafkaReceiptCompensateCommand` → `CompensateReceiptPdfCommand`.
+Update all references from `KafkaReceiptProcessCommand` → `ReceiptProcessCommand` and `KafkaReceiptCompensateCommand` → `ReceiptCompensateCommand`.
 
 Also update the `SagaCommandHandler` import to the new location and remove imports for old `usecase/` interfaces (since `SagaRouteConfig` no longer depends on use case interfaces directly — it only depends on `SagaCommandHandler`).
 
@@ -1432,7 +1429,7 @@ ls src/main/java/com/wpanther/receipt/pdf/infrastructure/adapter/in/kafka/
 
 # 4. Confirm new structure
 ls src/main/java/com/wpanther/receipt/pdf/infrastructure/adapter/in/kafka/dto/
-# Expected: CompensateReceiptPdfCommand.java, ReceiptProcessCommand.java
+# Expected: ReceiptCompensateCommand.java, ReceiptProcessCommand.java
 
 ls src/main/java/com/wpanther/receipt/pdf/application/port/in/
 # Expected: CompensateReceiptPdfUseCase.java, ProcessReceiptPdfUseCase.java
