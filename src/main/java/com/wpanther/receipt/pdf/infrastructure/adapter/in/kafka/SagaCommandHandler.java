@@ -48,7 +48,7 @@ public class SagaCommandHandler {
     }
 
     /**
-     * Handle a ReceiptCompensateCommand from saga orchestrator.
+     * Handle a CompensateReceiptPdfCommand from saga orchestrator.
      * Delegates to ReceiptPdfDocumentService.compensate() with plain fields.
      */
     public void handleCompensation(CompensateReceiptPdfCommand command) {

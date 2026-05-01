@@ -75,7 +75,7 @@ class CamelRouteConfigTest {
     }
 
     @Test
-    @DisplayName("Should serialize and deserialize ReceiptCompensateCommand")
+    @DisplayName("Should serialize and deserialize CompensateReceiptPdfCommand")
     void testCompensateReceiptPdfCommandSerialization() throws Exception {
         // Given
         CompensateReceiptPdfCommand command = new CompensateReceiptPdfCommand(
