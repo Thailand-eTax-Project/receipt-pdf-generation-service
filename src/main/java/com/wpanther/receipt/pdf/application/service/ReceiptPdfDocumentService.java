@@ -1,16 +1,19 @@
 package com.wpanther.receipt.pdf.application.service;
 
+import com.wpanther.receipt.pdf.application.dto.event.ReceiptPdfGeneratedEvent;
+import com.wpanther.receipt.pdf.application.port.in.CompensateReceiptPdfUseCase;
+import com.wpanther.receipt.pdf.application.port.in.ProcessReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.application.port.out.PdfEventPort;
 import com.wpanther.receipt.pdf.application.port.out.PdfStoragePort;
 import com.wpanther.receipt.pdf.application.port.out.SagaReplyPort;
+import com.wpanther.receipt.pdf.application.port.out.SignedXmlFetchPort;
 import com.wpanther.receipt.pdf.domain.model.ReceiptPdfDocument;
 import com.wpanther.receipt.pdf.domain.repository.ReceiptPdfDocumentRepository;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.KafkaReceiptCompensateCommand;
-import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.KafkaReceiptProcessCommand;
-import com.wpanther.receipt.pdf.application.dto.event.ReceiptPdfGeneratedEvent;
+import com.wpanther.receipt.pdf.domain.service.ReceiptPdfGenerationService;
 import com.wpanther.receipt.pdf.infrastructure.metrics.PdfGenerationMetrics;
-import lombok.RequiredArgsConstructor;
+import com.wpanther.saga.domain.enums.SagaStep;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,14 +21,171 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
-public class ReceiptPdfDocumentService {
+public class ReceiptPdfDocumentService
+        implements ProcessReceiptPdfUseCase, CompensateReceiptPdfUseCase {
+
+    private static final int MAX_RETRIES = 3;
 
     private final ReceiptPdfDocumentRepository repository;
     private final PdfEventPort pdfEventPort;
     private final SagaReplyPort sagaReplyPort;
     private final PdfGenerationMetrics pdfGenerationMetrics;
+    private final SignedXmlFetchPort signedXmlFetchPort;
+    private final ReceiptPdfGenerationService pdfGenerationService;
+    private final PdfStoragePort pdfStoragePort;
+
+    public ReceiptPdfDocumentService(
+            ReceiptPdfDocumentRepository repository,
+            PdfEventPort pdfEventPort,
+            SagaReplyPort sagaReplyPort,
+            PdfGenerationMetrics pdfGenerationMetrics,
+            SignedXmlFetchPort signedXmlFetchPort,
+            ReceiptPdfGenerationService pdfGenerationService,
+            PdfStoragePort pdfStoragePort
+    ) {
+        this.repository = repository;
+        this.pdfEventPort = pdfEventPort;
+        this.sagaReplyPort = sagaReplyPort;
+        this.pdfGenerationMetrics = pdfGenerationMetrics;
+        this.signedXmlFetchPort = signedXmlFetchPort;
+        this.pdfGenerationService = pdfGenerationService;
+        this.pdfStoragePort = pdfStoragePort;
+    }
+
+    // ─── ProcessReceiptPdfUseCase implementation ─────────────────────────────────────
+
+    @Override
+    public void process(String documentId, String documentNumber, String signedXmlUrl,
+                        String sagaId, SagaStep sagaStep, String correlationId)
+            throws ReceiptPdfGenerationException {
+        MDC.put("sagaId", sagaId);
+        MDC.put("documentId", documentId);
+        MDC.put("correlationId", correlationId);
+
+        try {
+            // Validate input fields
+            if (documentId == null || documentId.isBlank()
+                    || documentNumber == null || documentNumber.isBlank()
+                    || signedXmlUrl == null || signedXmlUrl.isBlank()) {
+                failGenerationAndPublish(
+                        null, "Missing required field: documentId, documentNumber, or signedXmlUrl",
+                        0, documentId, documentNumber, sagaId, sagaStep, correlationId);
+                throw new ReceiptPdfGenerationException(
+                        "Missing required field: documentId, documentNumber, or signedXmlUrl");
+            }
+
+            // Idempotency check
+            Optional<ReceiptPdfDocument> existingOpt = findByReceiptId(documentId);
+            if (existingOpt.isPresent()) {
+                ReceiptPdfDocument existing = existingOpt.get();
+                if (existing.isCompleted()) {
+                    publishIdempotentSuccess(existing, documentId, documentNumber, sagaId, sagaStep, correlationId);
+                    return;
+                }
+                if (existing.getRetryCount() >= MAX_RETRIES) {
+                    publishRetryExhausted(sagaId, sagaStep, correlationId, documentId, documentNumber);
+                    return;
+                }
+            }
+
+            // Begin generation
+            ReceiptPdfDocument doc;
+            int previousRetryCount = existingOpt.map(ReceiptPdfDocument::getRetryCount).orElse(0);
+            if (existingOpt.isPresent()) {
+                doc = replaceAndBeginGeneration(existingOpt.get().getId(), previousRetryCount, documentId, documentNumber);
+            } else {
+                doc = beginGeneration(documentId, documentNumber);
+            }
+
+            // Fetch signed XML
+            String signedXml;
+            try {
+                signedXml = signedXmlFetchPort.fetch(signedXmlUrl);
+            } catch (Exception e) {
+                failGenerationAndPublish(doc.getId(), e.getMessage(), previousRetryCount,
+                        documentId, documentNumber, sagaId, sagaStep, correlationId);
+                throw new ReceiptPdfGenerationException("Failed to fetch signed XML: " + e.getMessage(), e);
+            }
+
+            // Generate PDF
+            byte[] pdfBytes;
+            try {
+                pdfBytes = pdfGenerationService.generatePdf(documentNumber, signedXml);
+            } catch (com.wpanther.receipt.pdf.domain.exception.ReceiptPdfGenerationException e) {
+                failGenerationAndPublish(doc.getId(), e.getMessage(), previousRetryCount,
+                        documentId, documentNumber, sagaId, sagaStep, correlationId);
+                throw new ProcessReceiptPdfUseCase.ReceiptPdfGenerationException(e.getMessage(), e);
+            }
+
+            // Store PDF
+            String documentPath;
+            try {
+                documentPath = pdfStoragePort.store(documentNumber, pdfBytes);
+            } catch (Exception e) {
+                failGenerationAndPublish(doc.getId(), "PDF storage failed: " + e.getMessage(), previousRetryCount,
+                        documentId, documentNumber, sagaId, sagaStep, correlationId);
+                throw new ReceiptPdfGenerationException("PDF storage failed: " + e.getMessage(), e);
+            }
+
+            String fileUrl = pdfStoragePort.resolveUrl(documentPath);
+            long fileSize = pdfBytes.length;
+
+            // Complete generation
+            completeGenerationAndPublish(
+                    doc.getId(), documentPath, fileUrl, fileSize,
+                    previousRetryCount, documentId, documentNumber, sagaId, sagaStep, correlationId);
+
+            log.info("Receipt PDF generated successfully for saga {} receipt {}", sagaId, documentNumber);
+
+        } finally {
+            MDC.remove("sagaId");
+            MDC.remove("documentId");
+            MDC.remove("correlationId");
+        }
+    }
+
+    // ─── CompensateReceiptPdfUseCase implementation ──────────────────────────────────
+
+    @Override
+    public void compensate(String documentId, String sagaId, SagaStep sagaStep, String correlationId) {
+        MDC.put("sagaId", sagaId);
+        MDC.put("documentId", documentId);
+        MDC.put("correlationId", correlationId);
+
+        try {
+            Optional<ReceiptPdfDocument> docOpt = findByReceiptId(documentId);
+            if (docOpt.isEmpty()) {
+                log.warn("ReceiptPdfDocument not found for compensation: receiptId={}", documentId);
+                publishCompensated(sagaId, sagaStep, correlationId);
+                return;
+            }
+
+            ReceiptPdfDocument doc = docOpt.get();
+            try {
+                // Delete PDF from storage
+                if (doc.getDocumentPath() != null && !doc.getDocumentPath().isBlank()) {
+                    pdfStoragePort.delete(doc.getDocumentPath());
+                }
+                // Delete document from repository
+                deleteById(doc.getId());
+
+                publishCompensated(sagaId, sagaStep, correlationId);
+                log.info("Compensation completed for saga {} receipt {}", sagaId, doc.getReceiptNumber());
+
+            } catch (Exception e) {
+                publishCompensationFailure(sagaId, sagaStep, correlationId, e.getMessage());
+                throw new RuntimeException("Compensation failed for document " + documentId + ": " + e.getMessage(), e);
+            }
+
+        } finally {
+            MDC.remove("sagaId");
+            MDC.remove("documentId");
+            MDC.remove("correlationId");
+        }
+    }
+
+    // ─── Existing domain methods ────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public Optional<ReceiptPdfDocument> findByReceiptId(String receiptId) {
@@ -61,37 +221,35 @@ public class ReceiptPdfDocumentService {
     @Transactional
     public void completeGenerationAndPublish(UUID documentId, String s3Key, String fileUrl,
                                              long fileSize, int previousRetryCount,
-                                             KafkaReceiptProcessCommand command) {
+                                             String documentIdParam, String documentNumber,
+                                             String sagaId, SagaStep sagaStep, String correlationId) {
         ReceiptPdfDocument doc = requireDocument(documentId);
         doc.markCompleted(s3Key, fileUrl, fileSize);
         doc.markXmlEmbedded();
         applyRetryCount(doc, previousRetryCount);
         doc = repository.save(doc);
 
-        pdfEventPort.publishGenerated(buildGeneratedEvent(doc, command));
-        sagaReplyPort.publishSuccess(
-                command.getSagaId(), command.getSagaStep(), command.getCorrelationId(),
-                doc.getDocumentUrl(), doc.getFileSize());
+        pdfEventPort.publishGenerated(buildGeneratedEvent(doc, documentIdParam, documentNumber, sagaId, correlationId));
+        sagaReplyPort.publishSuccess(sagaId, sagaStep, correlationId, doc.getDocumentUrl(), doc.getFileSize());
 
-        log.info("Completed PDF generation for saga {} receipt {}",
-                command.getSagaId(), doc.getReceiptNumber());
+        log.info("Completed PDF generation for saga {} receipt {}", sagaId, doc.getReceiptNumber());
     }
 
     @Transactional
     public void failGenerationAndPublish(UUID documentId, String errorMessage,
                                          int previousRetryCount,
-                                         KafkaReceiptProcessCommand command) {
+                                         String documentIdParam, String documentNumber,
+                                         String sagaId, SagaStep sagaStep, String correlationId) {
         String safeError = errorMessage != null ? errorMessage : "PDF generation failed";
-        ReceiptPdfDocument doc = requireDocument(documentId);
-        doc.markFailed(safeError);
-        applyRetryCount(doc, previousRetryCount);
-        repository.save(doc);
-
-        sagaReplyPort.publishFailure(
-                command.getSagaId(), command.getSagaStep(), command.getCorrelationId(), safeError);
-
+        if (documentId != null) {
+            ReceiptPdfDocument doc = requireDocument(documentId);
+            doc.markFailed(safeError);
+            applyRetryCount(doc, previousRetryCount);
+            repository.save(doc);
+        }
+        sagaReplyPort.publishFailure(sagaId, sagaStep, correlationId, safeError);
         log.warn("PDF generation failed for saga {} receipt {}: {}",
-                command.getSagaId(), doc.getReceiptNumber(), safeError);
+                sagaId, documentNumber, safeError);
     }
 
     @Transactional
@@ -102,56 +260,49 @@ public class ReceiptPdfDocumentService {
 
     @Transactional
     public void publishIdempotentSuccess(ReceiptPdfDocument existing,
-                                         KafkaReceiptProcessCommand command) {
-        pdfEventPort.publishGenerated(buildGeneratedEvent(existing, command));
-        sagaReplyPort.publishSuccess(
-                command.getSagaId(), command.getSagaStep(), command.getCorrelationId(),
-                existing.getDocumentUrl(), existing.getFileSize());
-        log.warn("Receipt PDF already generated for saga {} — re-publishing SUCCESS reply",
-                command.getSagaId());
+                                         String documentId, String documentNumber,
+                                         String sagaId, SagaStep sagaStep, String correlationId) {
+        pdfEventPort.publishGenerated(buildGeneratedEvent(existing, documentId, documentNumber, sagaId, correlationId));
+        sagaReplyPort.publishSuccess(sagaId, sagaStep, correlationId, existing.getDocumentUrl(), existing.getFileSize());
+        log.warn("Receipt PDF already generated for saga {} — re-publishing SUCCESS reply", sagaId);
     }
 
     @Transactional
-    public void publishRetryExhausted(KafkaReceiptProcessCommand command) {
-        pdfGenerationMetrics.recordRetryExhausted(
-                command.getSagaId(),
-                command.getDocumentId(),
-                command.getDocumentNumber());
-        sagaReplyPort.publishFailure(
-                command.getSagaId(), command.getSagaStep(), command.getCorrelationId(),
-                "Maximum retry attempts exceeded");
-        log.error("Max retries exceeded for saga {} document {}",
-                command.getSagaId(), command.getDocumentNumber());
+    public void publishRetryExhausted(String sagaId, SagaStep sagaStep, String correlationId,
+                                      String documentId, String documentNumber) {
+        pdfGenerationMetrics.recordRetryExhausted(sagaId, documentId, documentNumber);
+        sagaReplyPort.publishFailure(sagaId, sagaStep, correlationId, "Maximum retry attempts exceeded");
+        log.error("Max retries exceeded for saga {} document {}", sagaId, documentNumber);
     }
 
     @Transactional
-    public void publishGenerationFailure(KafkaReceiptProcessCommand command, String errorMessage) {
-        sagaReplyPort.publishFailure(
-                command.getSagaId(), command.getSagaStep(), command.getCorrelationId(), errorMessage);
+    public void publishGenerationFailure(String sagaId, SagaStep sagaStep, String correlationId, String errorMessage) {
+        sagaReplyPort.publishFailure(sagaId, sagaStep, correlationId, errorMessage);
     }
 
     @Transactional
-    public void publishCompensated(KafkaReceiptCompensateCommand command) {
-        sagaReplyPort.publishCompensated(
-                command.getSagaId(), command.getSagaStep(), command.getCorrelationId());
+    public void publishCompensated(String sagaId, SagaStep sagaStep, String correlationId) {
+        sagaReplyPort.publishCompensated(sagaId, sagaStep, correlationId);
     }
 
     @Transactional
-    public void publishCompensationFailure(KafkaReceiptCompensateCommand command, String error) {
-        sagaReplyPort.publishFailure(
-                command.getSagaId(), command.getSagaStep(), command.getCorrelationId(), error);
+    public void publishCompensationFailure(String sagaId, SagaStep sagaStep, String correlationId, String error) {
+        sagaReplyPort.publishFailure(sagaId, sagaStep, correlationId, error);
     }
+
+    // ─── Helper methods ────────────────────────────────────────────────────────────
 
     private ReceiptPdfGeneratedEvent buildGeneratedEvent(ReceiptPdfDocument doc,
-                                                         KafkaReceiptProcessCommand command) {
+                                                          String documentId, String documentNumber,
+                                                          String sagaId, String correlationId) {
         return new ReceiptPdfGeneratedEvent(
-                command.getSagaId(),
-                command.getDocumentId(),
+                sagaId,
+                documentId,
                 doc.getReceiptNumber(),
                 doc.getDocumentUrl(),
                 doc.getFileSize(),
                 doc.isXmlEmbedded(),
-                command.getCorrelationId());
+                correlationId);
     }
 
     private ReceiptPdfDocument requireDocument(UUID documentId) {
