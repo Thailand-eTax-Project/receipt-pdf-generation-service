@@ -7,7 +7,7 @@ import com.wpanther.receipt.pdf.domain.model.ReceiptPdfDocument;
 import com.wpanther.receipt.pdf.domain.repository.ReceiptPdfDocumentRepository;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.KafkaReceiptCompensateCommand;
 import com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.KafkaReceiptProcessCommand;
-import com.wpanther.receipt.pdf.infrastructure.adapter.out.messaging.ReceiptPdfGeneratedEvent;
+import com.wpanther.receipt.pdf.application.dto.event.ReceiptPdfGeneratedEvent;
 import com.wpanther.receipt.pdf.infrastructure.metrics.PdfGenerationMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,6 +1,7 @@
 package com.wpanther.receipt.pdf.infrastructure.adapter.out.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wpanther.receipt.pdf.application.dto.event.ReceiptPdfGeneratedEvent;
 import com.wpanther.receipt.pdf.application.port.out.PdfEventPort;
 import com.wpanther.saga.infrastructure.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
