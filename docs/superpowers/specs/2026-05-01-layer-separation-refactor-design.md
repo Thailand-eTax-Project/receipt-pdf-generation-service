@@ -32,8 +32,8 @@ In the reference:
 ```
 infrastructure/adapter/in/kafka/
 ├── dto/
-│   ├── ProcessReceiptPdfCommand       ← renamed from KafkaReceiptProcessCommand
-│   └── CompensateReceiptPdfCommand     ← renamed from KafkaReceiptCompensateCommand
+│   ├── ReceiptProcessCommand       ← renamed from KafkaReceiptProcessCommand
+│   └── ReceiptCompensateCommand     ← renamed from KafkaReceiptCompensateCommand
 ├── SagaCommandHandler                  ← thin adapter: only routes DTOs to use cases
 └── SagaRouteConfig                      ← (unchanged)
 
@@ -61,8 +61,8 @@ domain/
 
 ### 1. Rename Kafka DTOs to remove `Kafka` prefix
 
-Move `infrastructure/adapter/in/kafka/KafkaReceiptProcessCommand` → `dto/ProcessReceiptPdfCommand`
-Move `infrastructure/adapter/in/kafka/KafkaReceiptCompensateCommand` → `dto/CompensateReceiptPdfCommand`
+Move `infrastructure/adapter/in/kafka/KafkaReceiptProcessCommand` → `dto/ReceiptProcessCommand`
+Move `infrastructure/adapter/in/kafka/KafkaReceiptCompensateCommand` → `dto/ReceiptCompensateCommand`
 
 Package: `com.wpanther.receipt.pdf.infrastructure.adapter.in.kafka.dto`
 
