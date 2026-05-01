@@ -44,10 +44,12 @@ application/port/in/
 application/service/
 └── ReceiptPdfDocumentService           ← IMPLEMENTS use case interfaces; contains all orchestration logic
 
+application/dto/event/
+└── ReceiptPdfGeneratedEvent            ← (moved from infrastructure/adapter/out/messaging/)
+
 infrastructure/adapter/out/messaging/
-├── SagaReplyPublisher                  ← (unchanged — inline ReceiptPdfReplyEvent factory)
-├── EventPublisher                       ← (unchanged)
-└── ReceiptPdfGeneratedEvent            ← (unchanged — already correct location)
+├── SagaReplyPublisher                  ← (ReceiptPdfReplyEvent inlined here)
+└── EventPublisher                      ← (updated import for moved ReceiptPdfGeneratedEvent)
 
 domain/
 └── ...                                 ← (unchanged — no saga types)
