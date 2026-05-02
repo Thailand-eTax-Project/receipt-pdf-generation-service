@@ -42,7 +42,7 @@ class SagaReplyPublisherTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
-        sagaReplyPublisher = new SagaReplyPublisher(outboxService, objectMapper);
+        sagaReplyPublisher = new SagaReplyPublisher("saga.reply.receipt-pdf", outboxService, objectMapper);
     }
 
     @Test

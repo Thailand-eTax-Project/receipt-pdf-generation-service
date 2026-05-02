@@ -48,6 +48,7 @@ app:
       max-poll-records: ${KAFKA_MAX_POLL_RECORDS:100}
       consumers-count: ${KAFKA_CONSUMERS_COUNT:3}
     topics:
+      saga-reply-receipt-pdf: saga.reply.receipt-pdf
       saga-command-receipt-pdf: saga.command.receipt-pdf
       saga-compensation-receipt-pdf: saga.compensation.receipt-pdf
       pdf-generated-receipt: pdf.generated.receipt
