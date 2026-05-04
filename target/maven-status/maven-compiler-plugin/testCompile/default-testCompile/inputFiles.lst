@@ -1,0 +1,17 @@
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/application/service/ReceiptPdfDocumentServiceTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/application/service/SagaCommandHandlerTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/domain/constants/PdfGenerationConstantsTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/domain/exception/ReceiptPdfGenerationExceptionTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/domain/model/ReceiptPdfDocumentTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/adapter/out/client/RestTemplateSignedXmlFetcherTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/adapter/out/messaging/ArchiveBeforeUploadFailsTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/adapter/out/messaging/EventPublisherTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/adapter/out/messaging/OutboxDocumentArchiveAdapterTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/adapter/out/messaging/SagaReplyPublisherTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/adapter/out/pdf/FopReceiptPdfGeneratorTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/adapter/out/pdf/PdfA3ConverterTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/adapter/out/pdf/ReceiptPdfGenerationServiceImplTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/adapter/out/pdf/ThaiAmountWordsConverterTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/adapter/out/storage/MinioCleanupServiceTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/adapter/out/storage/MinioStorageAdapterTest.java
+/home/wpanther/projects/etax/invoice-microservices/services/receipt-pdf-generation-service/src/test/java/com/wpanther/receipt/pdf/infrastructure/config/CamelRouteConfigTest.java

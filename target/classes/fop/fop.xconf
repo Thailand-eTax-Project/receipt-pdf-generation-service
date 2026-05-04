@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<fop version="1.0">
+    <!-- Base configuration for Apache FOP -->
+
+    <strict-configuration>true</strict-configuration>
+    <strict-validation>false</strict-validation>
+    <base>.</base>
+
+    <!-- Source resolution in dpi -->
+    <source-resolution>96</source-resolution>
+    <!-- Target resolution in dpi -->
+    <target-resolution>96</target-resolution>
+
+    <!-- Default page dimensions -->
+    <default-page-settings height="297mm" width="210mm"/>
+
+    <!-- Renderer configuration -->
+    <renderers>
+        <renderer mime="application/pdf">
+            <!-- PDF version (1.4 for better compatibility, will be upgraded to PDF/A-3) -->
+            <version>1.4</version>
+
+            <!-- Enable PDF/A mode preparation -->
+            <!-- NOTE: PDF/A-3b prohibits encryption — do NOT add encryption-params here -->
+            <pdf-a-mode>PDF/A-3b</pdf-a-mode>
+
+            <!-- Filter configuration -->
+            <filterList>
+                <value>flate</value>
+            </filterList>
+
+            <!-- Font configuration -->
+            <fonts>
+                <!-- Base 14 fonts (always available) -->
+                <auto-detect/>
+
+                <!-- Register system fonts directory -->
+                <directory recursive="true">/usr/share/fonts</directory>
+                <directory recursive="true">/usr/local/share/fonts</directory>
+
+                <!-- Windows fonts (if running on Windows) -->
+                <directory recursive="true">C:\Windows\Fonts</directory>
+
+                <!-- Custom fonts directory in application.
+                     Paths are relative to this file's directory (classpath:fop/).
+                     "../fonts" resolves to classpath:fonts/, which is where the
+                     font TTF files are packaged in the JAR. -->
+                <directory recursive="true">../fonts</directory>
+
+                <!-- Thai font configuration -->
+                <!-- THSarabunNew - commonly used Thai font -->
+                <font kerning="yes" embed-url="../fonts/THSarabunNew.ttf">
+                    <font-triplet name="THSarabunNew" style="normal" weight="normal"/>
+                </font>
+                <font kerning="yes" embed-url="../fonts/THSarabunNew-Bold.ttf">
+                    <font-triplet name="THSarabunNew" style="normal" weight="bold"/>
+                </font>
+                <font kerning="yes" embed-url="../fonts/THSarabunNew-Italic.ttf">
+                    <font-triplet name="THSarabunNew" style="italic" weight="normal"/>
+                </font>
+                <font kerning="yes" embed-url="../fonts/THSarabunNew-BoldItalic.ttf">
+                    <font-triplet name="THSarabunNew" style="italic" weight="bold"/>
+                </font>
+
+                <!-- Noto Sans Thai Looped - Google font with Thai support (looped/traditional style) -->
+                <font kerning="yes" embed-url="../fonts/NotoSansThaiLooped-Regular.ttf">
+                    <font-triplet name="NotoSansThai" style="normal" weight="normal"/>
+                </font>
+                <font kerning="yes" embed-url="../fonts/NotoSansThaiLooped-Bold.ttf">
+                    <font-triplet name="NotoSansThai" style="normal" weight="bold"/>
+                </font>
+            </fonts>
+        </renderer>
+    </renderers>
+</fop>

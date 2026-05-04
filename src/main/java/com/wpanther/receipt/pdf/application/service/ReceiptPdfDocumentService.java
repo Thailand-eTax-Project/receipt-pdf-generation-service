@@ -1,8 +1,10 @@
 package com.wpanther.receipt.pdf.application.service;
 
+import com.wpanther.receipt.pdf.application.dto.event.DocumentArchiveEvent;
 import com.wpanther.receipt.pdf.application.dto.event.ReceiptPdfGeneratedEvent;
 import com.wpanther.receipt.pdf.application.port.in.CompensateReceiptPdfUseCase;
 import com.wpanther.receipt.pdf.application.port.in.ProcessReceiptPdfUseCase;
+import com.wpanther.receipt.pdf.application.port.out.DocumentArchivePort;
 import com.wpanther.receipt.pdf.application.port.out.PdfEventPort;
 import com.wpanther.receipt.pdf.application.port.out.PdfStoragePort;
 import com.wpanther.receipt.pdf.application.port.out.SagaReplyPort;
@@ -30,6 +32,7 @@ public class ReceiptPdfDocumentService
     private final ReceiptPdfDocumentRepository repository;
     private final PdfEventPort pdfEventPort;
     private final SagaReplyPort sagaReplyPort;
+    private final DocumentArchivePort documentArchivePort;
     private final PdfGenerationMetrics pdfGenerationMetrics;
     private final SignedXmlFetchPort signedXmlFetchPort;
     private final ReceiptPdfGenerationService pdfGenerationService;
@@ -39,6 +42,7 @@ public class ReceiptPdfDocumentService
             ReceiptPdfDocumentRepository repository,
             PdfEventPort pdfEventPort,
             SagaReplyPort sagaReplyPort,
+            DocumentArchivePort documentArchivePort,
             PdfGenerationMetrics pdfGenerationMetrics,
             SignedXmlFetchPort signedXmlFetchPort,
             ReceiptPdfGenerationService pdfGenerationService,
@@ -47,6 +51,7 @@ public class ReceiptPdfDocumentService
         this.repository = repository;
         this.pdfEventPort = pdfEventPort;
         this.sagaReplyPort = sagaReplyPort;
+        this.documentArchivePort = documentArchivePort;
         this.pdfGenerationMetrics = pdfGenerationMetrics;
         this.signedXmlFetchPort = signedXmlFetchPort;
         this.pdfGenerationService = pdfGenerationService;
@@ -230,6 +235,20 @@ public class ReceiptPdfDocumentService
         doc = repository.save(doc);
 
         pdfEventPort.publishGenerated(buildGeneratedEvent(doc, documentIdParam, documentNumber, sagaId, correlationId));
+
+        // Emit document.archive for unsigned PDF archival
+        documentArchivePort.publish(new DocumentArchiveEvent(
+                documentIdParam,
+                doc.getReceiptNumber(),
+                "RECEIPT",
+                "UNSIGNED_PDF",
+                doc.getDocumentUrl(),
+                doc.getReceiptNumber() + ".pdf",
+                "application/pdf",
+                doc.getFileSize(),
+                sagaId,
+                correlationId));
+
         sagaReplyPort.publishSuccess(sagaId, sagaStep, correlationId, doc.getDocumentUrl(), doc.getFileSize());
 
         log.info("Completed PDF generation for saga {} receipt {}", sagaId, doc.getReceiptNumber());

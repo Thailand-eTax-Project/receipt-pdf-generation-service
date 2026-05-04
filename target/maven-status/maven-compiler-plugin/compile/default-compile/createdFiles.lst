@@ -1,0 +1,3 @@
+com/wpanther/receipt/pdf/application/port/out/DocumentArchivePort.class
+com/wpanther/receipt/pdf/infrastructure/adapter/out/messaging/OutboxDocumentArchiveAdapter.class
+com/wpanther/receipt/pdf/application/dto/event/DocumentArchiveEvent.class

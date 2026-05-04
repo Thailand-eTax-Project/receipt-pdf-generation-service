@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.wpanther.receipt.pdf.infrastructure.adapter.out.messaging.ArchiveBeforeUploadFailsTest
+-------------------------------------------------------------------------------
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in com.wpanther.receipt.pdf.infrastructure.adapter.out.messaging.ArchiveBeforeUploadFailsTest

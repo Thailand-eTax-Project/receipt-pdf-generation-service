@@ -1,7 +1,9 @@
 package com.wpanther.receipt.pdf.application.service;
 
 import com.wpanther.saga.domain.enums.SagaStep;
+import com.wpanther.receipt.pdf.application.dto.event.DocumentArchiveEvent;
 import com.wpanther.receipt.pdf.application.dto.event.ReceiptPdfGeneratedEvent;
+import com.wpanther.receipt.pdf.application.port.out.DocumentArchivePort;
 import com.wpanther.receipt.pdf.application.port.out.PdfEventPort;
 import com.wpanther.receipt.pdf.application.port.out.SagaReplyPort;
 import com.wpanther.receipt.pdf.domain.model.GenerationStatus;
@@ -49,6 +51,9 @@ class ReceiptPdfDocumentServiceTest {
     private SagaReplyPort sagaReplyPort;
 
     @Mock
+    private DocumentArchivePort documentArchivePort;
+
+    @Mock
     private PdfGenerationMetrics pdfGenerationMetrics;
 
     @Mock
@@ -62,7 +67,7 @@ class ReceiptPdfDocumentServiceTest {
 
     private ReceiptPdfDocumentService getService() {
         return new ReceiptPdfDocumentService(
-                repository, pdfEventPort, sagaReplyPort,
+                repository, pdfEventPort, sagaReplyPort, documentArchivePort,
                 pdfGenerationMetrics, signedXmlFetchPort,
                 pdfGenerationService, pdfStoragePort);
     }
