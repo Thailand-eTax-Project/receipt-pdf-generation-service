@@ -136,6 +136,7 @@ This keeps Hikari connections free during CPU and I/O, preventing pool exhaustio
 | `saga.reply.receipt-pdf` | Produce (outbox) | SUCCESS / FAILURE / COMPENSATED replies to Orchestrator |
 | `pdf.generated.receipt` | Produce (outbox) | Notification event (header: `documentType=RECEIPT`, `correlationId`) |
 | `pdf.generation.receipt.dlq` | Produce (DLQ) | Dead-letter queue after 3 Camel retries |
+| `document.archive` | Produce (outbox) | Fire-and-forget archival (UNSIGNED_PDF stored by document-storage-service) |
 
 ### Input Command
 
