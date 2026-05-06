@@ -2,7 +2,7 @@
 
 A Spring Boot microservice for generating PDF/A-3b documents for Thai e-Tax receipts with embedded signed XML. Built with **Hexagonal Architecture (Ports/Adapters)** and **Saga Orchestration Pattern**.
 
-**Port:** 8095 | **Database:** PostgreSQL `receiptpdf_db` | **Kafka Topics:** `saga.command.receipt-pdf`, `saga.reply.receipt-pdf`, `pdf.generated.receipt`
+**Port:** 8094 | **Database:** PostgreSQL `receiptpdf_db` | **Kafka Topics:** `saga.command.receipt-pdf`, `saga.reply.receipt-pdf`, `pdf.generated.receipt`
 
 ## Tech Stack
 
@@ -267,7 +267,7 @@ Flyway automatically runs migrations on startup — `receipt_pdf_documents` tabl
 
 | Aspect | invoice-pdf-generation-service | receipt-pdf-generation-service |
 |--------|--------------------------------|---------------------------------|
-| Port | 8090 | 8095 |
+| Port | 8092 | 8094 |
 | Package | `com.wpanther.invoice.pdf` | `com.wpanther.receipt.pdf` |
 | Database | `invoicepdf_db` / `invoice_pdf_documents` | `receiptpdf_db` / `receipt_pdf_documents` |
 | Kafka Consume | `saga.command.invoice-pdf` | `saga.command.receipt-pdf` |
